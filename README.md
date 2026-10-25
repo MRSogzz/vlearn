@@ -77,7 +77,7 @@ Most YouTube summarizers return a paragraph you have to trust. vlearn is built a
 
 ```bash
 # 1. Install
-git clone https://github.com/<you>/vlearn.git
+git clone https://github.com/MRSogzz/vlearn.git
 cd vlearn
 pip install -e ".[media]"
 
@@ -392,7 +392,7 @@ vlearn uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to fetch subtitles and fr
 
 ## License
 
-[AGPL-3.0](LICENSE). Network services built on vlearn must publish their source. For commercial licensing: `<your-email>`
+[AGPL-3.0](LICENSE). Network services built on vlearn must publish their source. For commercial licensing: `<MRSogzz@gmail.com>`
 
 ## Acknowledgments
 

@@ -77,7 +77,7 @@ $ vlearn report run_abc123
 
 ```bash
 # 1. 安裝
-git clone https://github.com/<you>/vlearn.git
+git clone https://github.com/MRSogzz/vlearn.git
 cd vlearn
 pip install -e ".[media]"
 
@@ -391,7 +391,7 @@ vlearn 使用 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 抓取字幕與畫面�
 
 ## 授權
 
-[AGPL-3.0](LICENSE)。基於 vlearn 提供的網路服務必須公開原始碼。商業授權諮詢：`<your-email>`
+[AGPL-3.0](LICENSE)。基於 vlearn 提供的網路服務必須公開原始碼。商業授權諮詢：`<MRSogzz@gmail.com>`
 
 ## 致謝
 
