@@ -1,0 +1,80 @@
+platform:
+  primary: youtube
+  youtube:
+    api_key_env: YT_API_KEY
+  bilibili:
+    enabled: false
+
+output:
+  output_dir: ./out
+  report_format: markdown
+  export_obsidian: false
+  export_notion: false
+
+triage:
+  enabled: true
+  max_candidates_per_day: 30
+  deep_read_top_n: 4
+  min_duration_sec: 120
+  min_subtitle_chars: 400
+
+keyframes:
+  scene_threshold: 0.35
+  max_window_sec: 8.0
+  min_gap_sec: 1.0
+  sharpness_enabled: true
+  fixed_interval_sec: 90
+  fallback_enabled: true
+  phash_dedup_threshold: 6
+  max_frames_per_10min: 30
+  semantic_frame_request: true
+  fps_assumption: 30.0
+
+summary:
+  window_max_chars: 300
+  batch_windows: true
+  batch_size: 8
+  require_verifiable_claims: true
+  forbid_vague_phrasing: true
+
+evidence:
+  reliability_rank:
+    official_subtitle: 5
+    platform_metadata: 5
+    keyframe: 4
+    ocr: 3
+    asr: 2
+    danmaku: 1
+    comment: 1
+  keep_both_on_unresolved: true
+  max_backtracks: 5
+  backtrack_only_on: ["suspect", "conflict"]
+
+vision:
+  policy: on_demand          # always | on_demand | none
+  read_on: [conflict, suspect, semantic_request]
+  max_images_per_video: 25
+
+cost:
+  daily_usd: 2.0
+  per_video_usd: 0.10
+  on_exceed: degrade
+  degrade_order:
+    - vision.policy: none
+    - evidence.max_backtracks: 0
+    - summary.batch_windows: true
+  peak_hours_utc:
+    - "01:00-04:00"
+    - "06:00-10:00"
+
+publish:
+  comment_enabled: false
+  require_human_approval: true
+  daily_limit: 3
+  risk_stop_on_flag: true
+
+trend:
+  source: csv
+  csv_path: ./in/trend.csv
+  top_n: 20
+  light_summary_only: true

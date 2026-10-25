@@ -1,0 +1,70 @@
+# =============================================================================
+# vlearn model routing
+#
+# DEFAULT: fully local Gemma 4 (4B) for every stage.
+#         Why a 4B model? Because it's the smallest thing that still works:
+#         - It fits in ~4 GB VRAM (or runs on CPU, slowly)
+#         - It's permissively licensed and easy to run with llama.cpp / Ollama
+#         - Vision is coarse but sufficient for "man in red shirt on stage"
+#           level descriptions that drive evidence bundles
+#         - Zero API cost, fully offline
+#
+# UPGRADE PATH (all optional, zero code changes):
+#   - Qwen3-VL 27B for vision   → keyframe_desc quality jumps significantly
+#   - DeepSeek Flash for text   → ~$0.30/M input, faster, no GPU needed
+#   - GPT-4o / Claude Sonnet    → highest quality, ~$2/M input
+#   See docs below for copy-paste examples.
+# =============================================================================
+
+providers:
+  local:
+    # Point this at your llama.cpp / Ollama / LM Studio / vLLM endpoint.
+    # Default: llama.cpp on port 8080 with a Gemma 4 GGUF loaded.
+    base_url: http://127.0.0.1:8080/v1
+    api_key: sk-local          # llama.cpp ignores this, but the field must be set
+    models:
+      gemma:
+        role: cheap
+        supports_vision: true
+        # `served_model_name` is what gets sent in the request body.
+        # It must EXACTLY match what your server reports at GET /v1/models.
+        # If you swap GGUF files, change this line.
+        served_model_name: Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf
+        input_usd: 0.0
+        output_usd: 0.0
+        image_token_cap: 384   # 4B VLMs rarely use more than this per image
+
+  # ---------------------------------------------------------------------------
+  # Optional: cloud providers for when you want better quality.
+  # Uncomment, set the env var, and change the `routing` section below.
+  # ---------------------------------------------------------------------------
+  # deepseek:
+  #   base_url: https://api.deepseek.com/v1
+  #   api_key_env: DEEPSEEK_API_KEY
+  #   models:
+  #     flash:
+  #       role: cheap
+  #       supports_vision: false    # DeepSeek Flash is text-only today
+  #       input_usd: 0.30
+  #       output_usd: 1.20
+  # openai:
+  #   base_url: https://api.openai.com/v1
+  #   api_key_env: OPENAI_API_KEY
+  #   models:
+  #     sol_6_1:
+  #       role: strong
+  #       supports_vision: true
+  #       input_usd: 2.00
+  #       output_usd: 10.00
+
+# Every stage routes to the same Gemma 4 by default.
+# Everything runs locally, costs nothing, and works offline after ingest.
+routing:
+  triage:        {provider: local, model: gemma}
+  local_summary: {provider: local, model: gemma}
+  keyframe_desc: {provider: local, model: gemma}
+  followup:      {provider: local, model: gemma}
+  # arbitration / final_summary are intentionally left unset.
+  # With no `strong` provider configured, vlearn falls back to the
+  # template-based renderer in app/fusion/final.py — which is what you
+  # want on a local-only setup.

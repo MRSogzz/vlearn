@@ -1,0 +1,120 @@
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ============================================================
+# Virtual environments
+# ============================================================
+.venv/
+.venv311/
+venv/
+env/
+ENV/
+video/
+
+# ============================================================
+# Testing / linting / typing caches
+# ============================================================
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# ============================================================
+# IDE / editors
+# ============================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.spyproject
+
+# ============================================================
+# OS
+# ============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ============================================================
+# Project state — never commit local data
+# ============================================================
+out/
+cache/
+in/*.csv
+!in/example_trend.csv
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ============================================================
+# Models and media
+# ============================================================
+models/*.gguf
+models/*.bin
+models/*.safetensors
+models/*.onnx
+*.mp4
+*.mkv
+*.webm
+*.avi
+*.mov
+
+# ============================================================
+# Secrets / local config
+# ============================================================
+.env
+.env.local
+*.local.yaml
+config/local.yaml
+
+# ============================================================
+# Logs
+# ============================================================
+*.log
+logs/
+
+# ============================================================
+# Debug scripts (local only, not part of the project)
+# ============================================================
+diag_*.py
+check_*.py
+test_*_manual.py
+test_repetition_results.json
