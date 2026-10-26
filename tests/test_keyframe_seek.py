@@ -1,5 +1,6 @@
 from app.keyframes.selector import (
-    select_keyframes_seek, select_keyframes_dispatch,
+    select_keyframes_dispatch,
+    select_keyframes_seek,
 )
 
 

@@ -9,18 +9,20 @@ EvidenceBundle 層合流。
   供 orchestrator 回寫 keyframes 表，保證回溯鏈完整
 """
 from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass, field
-from typing import Optional
 
+from app.adapters.base import VideoMeta
 from app.context import AppContext
 from app.keyframes.classifier import (
-    ClassResult, budget_for_class, classify_video, edge_density,
+    ClassResult,
+    budget_for_class,
+    classify_video,
 )
 from app.keyframes.describe import describe_frame
 from app.keyframes.scanner import scan_candidates
 from app.keyframes.selector import select_keyframes_dispatch
-from app.adapters.base import VideoMeta
 
 
 @dataclass

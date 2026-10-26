@@ -8,7 +8,7 @@
 - 全帶 quality_flags → 退回全集
 - 空 summaries → unresolved
 """
-from app.evidence.arbiter import arbitrate, RELIABILITY
+from app.evidence.arbiter import RELIABILITY, arbitrate
 from app.schemas import EvidenceBundle, SourceType
 
 

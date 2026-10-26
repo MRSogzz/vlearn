@@ -1,4 +1,4 @@
-from app.keyframes.selector import select_keyframes, _frame_before
+from app.keyframes.selector import _frame_before, select_keyframes
 
 FPS = 30.0
 MAX_W = 8.0

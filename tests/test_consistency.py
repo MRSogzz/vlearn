@@ -6,7 +6,7 @@
 - 數字差異 > 20% → suspect
 - 單源 / 空 bundle 的兜底
 """
-from app.evidence.consistency import check_bundle, _normalize_color, _normalize_number
+from app.evidence.consistency import _normalize_color, _normalize_number, check_bundle
 
 
 def _make_summary(sid: str, source_type: str, assertions: list[dict]) -> dict:

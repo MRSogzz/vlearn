@@ -1,10 +1,10 @@
 from __future__ import annotations
+
 import base64
 from pathlib import Path
-from typing import Optional
 
 from mcp.server.mcpserver import MCPServer
-from mcp.types import TextContent, ImageContent
+from mcp.types import ImageContent, TextContent
 
 from app.context import AppContext
 from app.evidence.arbiter import arbitrate
@@ -44,7 +44,7 @@ def register(mcp: MCPServer, ctx: AppContext) -> None:
     # ============================================================
 
     @mcp.tool()
-    def import_trend_csv(path: Optional[str] = None) -> dict:
+    def import_trend_csv(path: str | None = None) -> dict:
         """導入短影音熱度 CSV。"""
         p = path or ctx.config["trend"]["csv_path"]
         n = ctx.db.import_trend_csv(p)
@@ -196,7 +196,7 @@ def register(mcp: MCPServer, ctx: AppContext) -> None:
         """
         from app.adapters.base import VideoMeta
         from app.keyframes.describe import _KEYFRAME_PROMPT
-        from app.summarize.local import _parse_llm_json, _filter_llm_assertions
+        from app.summarize.local import _filter_llm_assertions, _parse_llm_json
 
         # ★ MCP 客戶端可能把 False 序列化為字符串 "False"
         include_image = _to_bool(include_image, default=True)

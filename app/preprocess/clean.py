@@ -1,5 +1,6 @@
 """文本清洗：去標籤、合併空行、去除純音效/純符號標記。"""
 from __future__ import annotations
+
 import re
 
 _TAG = re.compile(r"<[^>]+>")

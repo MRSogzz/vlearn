@@ -8,9 +8,11 @@
 兩者共用 SelectedFrame 輸出 schema，下游不感知內部實現。
 """
 from __future__ import annotations
+
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, Sequence
+from typing import Literal
 
 
 @dataclass

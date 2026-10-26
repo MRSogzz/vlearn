@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum
-from typing import Literal, Optional
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -54,9 +56,9 @@ class Keyframe(BaseModel):
     ]
     sharpness_score: float = 0.0
     quality_flags: list[QualityFlag] = Field(default_factory=list)
-    image_path: Optional[str] = None
-    prev_scene_boundary: Optional[float] = None
-    next_scene_boundary: Optional[float] = None
+    image_path: str | None = None
+    prev_scene_boundary: float | None = None
+    next_scene_boundary: float | None = None
 
 
 class Assertion(BaseModel):
@@ -92,7 +94,7 @@ class ConflictRecord(BaseModel):
     bundle_id: str
     sources: list[str]
     status: Literal["resolved", "unresolved"]
-    adopted_source: Optional[str] = None
+    adopted_source: str | None = None
     reason: str = ""
     confidence: Literal["high", "medium", "low"] = "medium"
     keep_both_versions: bool = True

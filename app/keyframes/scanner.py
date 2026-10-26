@@ -1,12 +1,11 @@
 """由粗到細掃描：240p 每 N 秒 seek → dHash 對比 → 差異大區間遞歸細分。"""
 from __future__ import annotations
-from typing import Optional
 
 import numpy as np
 from PIL import Image
 
 
-def dhash(image_path: str, size: int = 8) -> Optional[str]:
+def dhash(image_path: str, size: int = 8) -> str | None:
     """返回 16 進制 dhash 字符串（64 bit）。"""
     try:
         img = Image.open(image_path).convert("L").resize((size + 1, size))
@@ -45,7 +44,7 @@ def scan_candidates(
     step = meta.duration / n_seeks
     timestamps = [step * (i + 0.5) for i in range(n_seeks)]
 
-    prev_hash: Optional[str] = None
+    prev_hash: str | None = None
     candidates: list[float] = []
     for ts in timestamps:
         frame = adapter.extract_frame_at(meta, ts, "240p")

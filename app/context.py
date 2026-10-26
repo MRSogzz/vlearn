@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,7 +37,7 @@ class AppContext:
         return p if p.is_absolute() else (self.project_root / p).resolve()
 
     @classmethod
-    def from_config(cls, config_path: str) -> "AppContext":
+    def from_config(cls, config_path: str) -> AppContext:
         cfg_path = Path(config_path).resolve()
         if not cfg_path.exists():
             raise FileNotFoundError(f"config not found: {cfg_path}")

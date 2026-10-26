@@ -1,5 +1,6 @@
 """固定間隔兜底 + pHash 去重。"""
 from __future__ import annotations
+
 import subprocess
 from pathlib import Path
 
@@ -35,7 +36,7 @@ def phash_dedup(paths: list[str], threshold: int = 6) -> list[str]:
         from PIL import Image
     except ImportError:
         return paths
-    kept: list[tuple[str, "imagehash.ImageHash"]] = []
+    kept: list[tuple[str, imagehash.ImageHash]] = []
     for p in paths:
         try:
             h = imagehash.phash(Image.open(p))

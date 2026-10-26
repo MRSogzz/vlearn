@@ -1,5 +1,6 @@
 """TrendSource：從 CSV 讀取熱度清單。"""
 from __future__ import annotations
+
 from pathlib import Path
 
 

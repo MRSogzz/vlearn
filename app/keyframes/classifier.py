@@ -1,13 +1,10 @@
 """視頻內容分類器：3 幀探針 + metadata + 字幕密度，決定掃描策略與幀預算。"""
 from __future__ import annotations
-import re
+
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional
 
 import numpy as np
 from PIL import Image
-
 
 SEMANTIC_TRIGGERS = {
     "zh": [
@@ -57,7 +54,7 @@ def edge_density(image_path: str) -> float:
         return 0.0
 
 
-def _title_hint(title: str) -> Optional[str]:
+def _title_hint(title: str) -> str | None:
     title_lower = title.lower()
     for cls, keywords in TITLE_SIGNALS.items():
         if any(kw in title_lower for kw in keywords):

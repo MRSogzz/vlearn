@@ -14,8 +14,7 @@
   - ASR 錯誤是"聽錯詞"（"二點五"→"二點無"），會直接扭曲數字斷言
   - 對數字/顏色類斷言，VLM 比 ASR 更可靠
 """
-from app.schemas import EvidenceBundle, ConflictRecord, SourceType
-
+from app.schemas import ConflictRecord, EvidenceBundle, SourceType
 
 RELIABILITY = {
     SourceType.OFFICIAL_SUBTITLE: 5,

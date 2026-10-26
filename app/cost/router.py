@@ -18,13 +18,13 @@
 - 圖片放在 text 之前（Qwen3-VL chat template 對順序敏感）
 """
 from __future__ import annotations
+
 import base64
 import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 import httpx
 
@@ -63,7 +63,7 @@ class ModelRouter:
         self.peak_hours = peak_hours or []
         self.ledger = ledger
 
-    def route(self, stage: str) -> Optional[ModelRef]:
+    def route(self, stage: str) -> ModelRef | None:
         r = self.cfg.get("routing", {}).get(stage)
         if not r:
             return None
@@ -104,9 +104,9 @@ class ModelRouter:
 
     def call(self, stage: str, run_id: str, *,
              messages: list[dict],
-             images: Optional[list[str]] = None,
+             images: list[str] | None = None,
              temperature: float = 0.2,
-             max_tokens: int = 1024) -> Optional[str]:
+             max_tokens: int = 1024) -> str | None:
         """返回文本；無 key 或失敗時返回 None（調用方降級）。
 
         帶圖片的調用強制加 llama.cpp WebUI 的完整字段集：
@@ -167,7 +167,7 @@ class ModelRouter:
                            is_peak=ref.is_peak, stage=stage)
         return text
 
-    def _call_blocking(self, ref: ModelRef, payload: dict) -> Optional[str]:
+    def _call_blocking(self, ref: ModelRef, payload: dict) -> str | None:
         with httpx.Client(timeout=300) as client:
             r = client.post(
                 f"{ref.base_url}/chat/completions",
@@ -182,7 +182,7 @@ class ModelRouter:
         payload["_usage"] = usage
         return data["choices"][0]["message"].get("content") or ""
 
-    def _call_stream(self, ref: ModelRef, payload: dict) -> Optional[str]:
+    def _call_stream(self, ref: ModelRef, payload: dict) -> str | None:
         chunks: list[str] = []
         with httpx.stream(
             "POST",
@@ -214,7 +214,7 @@ class ModelRouter:
         return "".join(chunks) if chunks else ""
 
     def _build_messages(self, messages: list[dict],
-                        images: Optional[list[str]]) -> list[dict]:
+                        images: list[str] | None) -> list[dict]:
         """把圖片合入最後一條 user message。
 
         ★ image 必須在 text 之前
@@ -268,7 +268,7 @@ class ModelRouter:
 
         return out
 
-    def _load_image_data(self, path: str) -> Optional[str]:
+    def _load_image_data(self, path: str) -> str | None:
         p = Path(path)
         if not p.exists():
             return None

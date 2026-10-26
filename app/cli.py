@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import argparse
 import sys
 
@@ -18,27 +19,35 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--config", default="config/default.yaml")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    s = sub.add_parser("ingest"); s.add_argument("url")
+    s = sub.add_parser("ingest")
+    s.add_argument("url")
     s.add_argument("--platform", default="youtube")
 
-    s = sub.add_parser("run"); s.add_argument("video_id")
+    s = sub.add_parser("run")
+    s.add_argument("video_id")
     s.add_argument("--profile", default="standard")
 
-    s = sub.add_parser("report"); s.add_argument("run_id")
+    s = sub.add_parser("report")
+    s.add_argument("run_id")
     s.add_argument("--format", default="md")
 
-    s = sub.add_parser("review"); s.add_argument("run_id")
+    s = sub.add_parser("review")
+    s.add_argument("run_id")
     s.add_argument("--ref", required=True)
     s.add_argument("--old", required=True)
     s.add_argument("--new", required=True)
     s.add_argument("--note", default="")
 
-    s = sub.add_parser("cost"); s.add_argument("--daily", action="store_true")
+    s = sub.add_parser("cost")
+    s.add_argument("--daily", action="store_true")
 
-    s = sub.add_parser("videos"); s.add_argument("--limit", type=int, default=20)
+    s = sub.add_parser("videos")
+    s.add_argument("--limit", type=int, default=20)
 
-    s = sub.add_parser("trend"); s.add_argument("action", choices=["import", "run"])
-    s.add_argument("--path"); s.add_argument("--top", type=int, default=20)
+    s = sub.add_parser("trend")
+    s.add_argument("action", choices=["import", "run"])
+    s.add_argument("--path")
+    s.add_argument("--top", type=int, default=20)
 
     args = p.parse_args(argv)
     ctx = _ctx(args)
@@ -60,7 +69,6 @@ def main(argv: list[str] | None = None) -> int:
         if not row:
             console.print(f"[red]report {args.run_id} not found[/red]")
             return 1
-        # markup=False, highlight=False：報告含 [official_subtitle] 等方括號文本
         console.print(row["report_md"], markup=False, highlight=False)
         return 0
 

@@ -1,10 +1,10 @@
 """YouTube：extract_info 提字幕 + 三檔降級抽幀 + 3 幀探針。"""
 from __future__ import annotations
+
 import json
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Optional
 
 import httpx
 import yt_dlp
@@ -64,7 +64,7 @@ class YouTubeAdapter(PlatformAdapter):
                     return parsed
         return []
 
-    def _http_get(self, url: str) -> Optional[str]:
+    def _http_get(self, url: str) -> str | None:
         try:
             r = httpx.get(url, timeout=30,
                           headers={"User-Agent": "Mozilla/5.0 (compatible; vlearn/0.1)"})
@@ -162,7 +162,7 @@ class YouTubeAdapter(PlatformAdapter):
         return self._parse_json3(data, "en")
 
     # ---------- 完整下載（可選，用於場景檢測） ----------
-    def download_media(self, meta: VideoMeta) -> Optional[str]:
+    def download_media(self, meta: VideoMeta) -> str | None:
         if not self.cfg.get("download_media"):
             return None
         out_dir = Path("./cache/media")
@@ -188,7 +188,7 @@ class YouTubeAdapter(PlatformAdapter):
 
     def extract_frame_at(self, meta: VideoMeta, timestamp: float,
                          quality: str = "720p",
-                         window: float = 2.0) -> Optional[str]:
+                         window: float = 2.0) -> str | None:
         """三檔降級：片段下載 → ffmpeg URL → None。
 
         磁盤佔用：~200KB/幀（片段下載）或 0（URL 直取，但可能偏 2s）。
@@ -224,7 +224,7 @@ class YouTubeAdapter(PlatformAdapter):
     def _download_section_and_extract(
         self, meta: VideoMeta, timestamp: float,
         frame_path: Path, window: float, fmt: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         tmp = Path("./cache/tmp")
         tmp.mkdir(parents=True, exist_ok=True)
         stem = f"{meta.video_id}_{timestamp:.3f}"
@@ -238,7 +238,7 @@ class YouTubeAdapter(PlatformAdapter):
             "force_keyframes_at_cuts": True,
             "remote_components": ["ejs:github"],
         }
-        actual: Optional[Path] = None
+        actual: Path | None = None
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([meta.url])
@@ -269,7 +269,7 @@ class YouTubeAdapter(PlatformAdapter):
     def _ffmpeg_url_seek(
         self, meta: VideoMeta, timestamp: float,
         frame_path: Path, fmt: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         try:
             with yt_dlp.YoutubeDL({"quiet": True, "skip_download": True,
                                     "format": fmt,
@@ -314,7 +314,7 @@ class YouTubeAdapter(PlatformAdapter):
 
         frames = [
             {"timestamp": ts, "path": p, "quality": "240p"}
-            for ts, p in zip(timestamps[:2], results) if p
+            for ts, p in zip(timestamps[:2], results, strict=False) if p
         ]
 
         # 早停判斷由 classifier 決定；這裡只取第 3 幀如果前 2 幀都有

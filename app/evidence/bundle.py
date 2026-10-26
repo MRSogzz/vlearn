@@ -13,6 +13,7 @@
   - min = 6.7% < 50% → 不合併 ✓
 """
 from __future__ import annotations
+
 import uuid
 
 

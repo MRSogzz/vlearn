@@ -1,10 +1,8 @@
 """VLM 描述關鍵幀 → 斷言。"""
 from __future__ import annotations
-from typing import Optional
 
 from app.context import AppContext
-from app.summarize.local import _parse_llm_json, _filter_llm_assertions
-
+from app.summarize.local import _filter_llm_assertions, _parse_llm_json
 
 _KEYFRAME_PROMPT = (
     "這是一段視頻在 {ts:.1f}s 處的關鍵幀。"
@@ -27,7 +25,7 @@ def describe_frame(
     timestamp: float,
     time_range: tuple[float, float],
     frame_ref: str,
-) -> Optional[dict]:
+) -> dict | None:
     """返回 {summary, assertions}；不可用時返回 None。"""
     if not ctx.router.available("keyframe_desc"):
         return None

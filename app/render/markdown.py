@@ -1,5 +1,6 @@
 """報告渲染：把 final fusion 結果落成 Markdown 文件。"""
 from __future__ import annotations
+
 from pathlib import Path
 
 

@@ -1,5 +1,6 @@
 """對 suspect/conflict 窗口回溯原始字幕與原圖。"""
 from __future__ import annotations
+
 from app.context import AppContext
 
 

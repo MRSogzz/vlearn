@@ -1,5 +1,6 @@
 """摄取管线：元数据 + 字幕 + 清洗 + 统一时间轴。"""
 from __future__ import annotations
+
 import uuid
 
 from app.context import AppContext
@@ -11,7 +12,7 @@ def ingest_url(ctx: AppContext, url: str, platform: str = "youtube") -> dict:
     ctx.db.upsert_video(meta.__dict__)
 
     from app.preprocess.clean import clean_text, dedup_adjacent
-    from app.preprocess.timeline import unify_timeline, merge_close
+    from app.preprocess.timeline import merge_close, unify_timeline
 
     raw = adapter.get_subtitles(meta)
     cleaned = []

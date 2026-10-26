@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 import csv
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS videos (
@@ -143,7 +145,7 @@ class Database:
                 {**meta, "created_at": _now()},
             )
 
-    def get_video(self, video_id: str) -> Optional[dict]:
+    def get_video(self, video_id: str) -> dict | None:
         with self.conn() as c:
             r = c.execute("SELECT * FROM videos WHERE video_id=?", (video_id,)).fetchone()
             return dict(r) if r else None
@@ -168,7 +170,7 @@ class Database:
             )
         return len(segs)
 
-    def segments(self, video_id: str, source_type: Optional[str] = None) -> list[dict]:
+    def segments(self, video_id: str, source_type: str | None = None) -> list[dict]:
         q = "SELECT * FROM segments WHERE video_id=?"
         args: list[Any] = [video_id]
         if source_type:
@@ -219,7 +221,7 @@ class Database:
             c.execute("INSERT OR REPLACE INTO triage (video_id,verdict,reason,created_at) "
                       "VALUES (?,?,?,?)", (video_id, verdict, reason, _now()))
 
-    def get_triage(self, video_id: str) -> Optional[dict]:
+    def get_triage(self, video_id: str) -> dict | None:
         with self.conn() as c:
             r = c.execute("SELECT * FROM triage WHERE video_id=?", (video_id,)).fetchone()
             return dict(r) if r else None
@@ -234,7 +236,7 @@ class Database:
                 (run_id, video_id, md, json.dumps(assertions),
                  json.dumps(unresolved), _now()))
 
-    def get_report(self, run_id: str) -> Optional[dict]:
+    def get_report(self, run_id: str) -> dict | None:
         with self.conn() as c:
             r = c.execute("SELECT * FROM reports WHERE run_id=?", (run_id,)).fetchone()
             return dict(r) if r else None
@@ -256,7 +258,7 @@ class Database:
             c.execute(f"UPDATE jobs SET {sets}, updated_at=? WHERE job_id=?",
                       (*vals, _now(), job_id))
 
-    def get_job(self, job_id: str) -> Optional[dict]:
+    def get_job(self, job_id: str) -> dict | None:
         with self.conn() as c:
             r = c.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
             return dict(r) if r else None

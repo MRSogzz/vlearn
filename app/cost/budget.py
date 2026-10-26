@@ -1,5 +1,6 @@
 """預算守衛：超 per_video 降級，超 daily 停止或降級。"""
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 from app.cost.ledger import CostLedger

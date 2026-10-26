@@ -1,5 +1,6 @@
 """最終總結：有 strong 模型則 LLM 融合，否則模板拼接。"""
 from __future__ import annotations
+
 import json
 
 from app.context import AppContext

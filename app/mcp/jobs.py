@@ -1,5 +1,6 @@
 """後臺 job：SQLite + 線程池。立即返回 job_id，客戶端輪詢。"""
 from __future__ import annotations
+
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 

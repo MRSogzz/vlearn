@@ -1,5 +1,6 @@
 """統一管道：CLI 與 MCP 共用。"""
 from __future__ import annotations
+
 import uuid
 from pathlib import Path
 
@@ -11,8 +12,7 @@ from app.evidence.consistency import check_bundle
 from app.fusion.final import render_final
 from app.fusion.interleave import interleave
 from app.ingest.pipeline import ingest_url
-from app.keyframes.fallback import (extract_frame, fixed_interval_points,
-                                    phash_dedup)
+from app.keyframes.fallback import extract_frame, fixed_interval_points, phash_dedup
 from app.keyframes.scene import detect_scene_points, measure_sharpness
 from app.keyframes.selector import select_keyframes_dispatch
 from app.render.markdown import render_report
@@ -260,7 +260,7 @@ class Orchestrator:
         if profile_rt.max_backtracks > 0:
             from app.backtrace.backtrace import backtrace
             bt_budget = profile_rt.max_backtracks
-            for c, b in zip([cf for cf in conflicts if cf["status"] == "unresolved"], bundles):
+            for c, b in zip([cf for cf in conflicts if cf["status"] == "unresolved"], bundles, strict=False):
                 if bt_budget <= 0:
                     break
                 if c.get("bundle_id") != b["id"]:

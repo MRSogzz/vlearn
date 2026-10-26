@@ -1,5 +1,6 @@
 """FFmpeg scdet 場景檢測。"""
 from __future__ import annotations
+
 import re
 import subprocess
 
@@ -18,10 +19,11 @@ def detect_scene_points(video_path: str, threshold: float = 0.35) -> list[float]
 def measure_sharpness(video_path: str, ts: float) -> float:
     """簡化：截一幀，用 Laplacian 方差近似清晰度。"""
     try:
+        import io
         import subprocess as sp
+
         import numpy as np
         from PIL import Image
-        import io
         cmd = ["ffmpeg", "-hide_banner", "-nostats", "-ss", f"{ts:.3f}",
                "-i", video_path, "-frames:v", "1", "-f", "image2pipe",
                "-vcodec", "png", "-"]

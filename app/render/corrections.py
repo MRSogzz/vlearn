@@ -6,6 +6,7 @@
 3. 寫回 report_md（保留 assertions / unresolved 的原始結構，不破壞 JSON）
 """
 from __future__ import annotations
+
 import json
 from pathlib import Path
 
