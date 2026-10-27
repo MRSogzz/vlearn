@@ -4,12 +4,12 @@
 
 ### 讓能讀圖、但不能讀影片的 LLM 也能理解 YouTube 影片
 
-**把任意 YouTube 影片轉成結構化、帶時間戳、可驗證的報告。本地模型 + 15 個 MCP 工具，零 API 費用。**
+**開源、模型無關的 MCP 服務器，把 YouTube 影片轉成結構化、帶時間戳、可驗證的報告。支援任何 OpenAI 相容端點，雲端或本地皆可；完全本地執行時零成本。**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-yellow.svg)](LICENSE)
 [![MCP Server](https://img.shields.io/badge/MCP-15%20tools-purple.svg)](#mcp-server)
-[![Local LLM](https://img.shields.io/badge/LLM-llama.cpp%20%7C%20Ollama-orange.svg)](https://github.com/ggerganov/llama.cpp)
+[![OpenAI-compatible](https://img.shields.io/badge/LLM-OpenAI--compatible-orange.svg)](#設定)
 
 [English](README.md) · **繁體中文**
 
@@ -19,7 +19,7 @@
 
 ---
 
-vlearn 是開源的 **YouTube 影片摘要工具與 MCP Server**，適合想要「驗證」摘要而不只是閱讀的人。它結合字幕、關鍵幀與本地視覺語言模型（VLM），產出**每條斷言都帶時間戳與來源**的報告；來源之間互相矛盾時會**明確標示，而不是悄悄合併**。
+vlearn 是開源的 **YouTube 影片摘要工具與 MCP Server**，適合想要「驗證」摘要而不只是閱讀的人。它結合字幕、關鍵幀與視覺語言模型（VLM，本地或雲端皆可），產出**每條斷言都帶時間戳與來源**的報告；來源之間互相矛盾時會**明確標示，而不是悄悄合併**。
 
 它也讓 AI Agent（Claude Desktop、Hermes 等 MCP 用戶端）即使底層模型**能讀圖但沒有原生影片輸入**，也能處理影片：Agent 拿到的不是原始影片，而是帶時間戳的字幕與關鍵幀描述時間軸，並且可以**隨時按需取任意單幀**。
 
@@ -58,7 +58,7 @@ $ vlearn report run_abc123
 
 - **可驗證。** 每條斷言都標註時間戳與來源類型（`official_subtitle`、`keyframe_ocr`、`keyframe_vlm`、`asr`、`danmaku`），可以直接回到證據。
 - **誠實面對衝突。** 字幕說一套、畫面顯示另一套時，vlearn 依來源可靠性仲裁；無法裁決時**保留雙版本**。
-- **不只看逐字稿，也看畫面。** 關鍵幀依場景變化挑選，由本地 VLM 描述。圖片管線獨立於字幕，無聲影片也能處理。
+- **不只看逐字稿，也看畫面。** 關鍵幀依場景變化挑選，由 VLM 描述。圖片管線獨立於字幕，無聲影片也能處理。
 
 | | 一般摘要工具 | **vlearn** |
 |---|---|---|
@@ -73,11 +73,11 @@ $ vlearn report run_abc123
 
 ## 快速開始
 
-**前置需求：** Python 3.10+、FFmpeg、[Deno](https://deno.com/)（yt-dlp 需要）。本地 LLM 服務為可選，但建議啟動。
+**前置需求：** Python 3.10+、FFmpeg、[Deno](https://deno.com/)（yt-dlp 需要）。LLM 端點（本地服務或雲端 API）為可選，但建議設定。畫面分析需要支援視覺的模型；字幕摘要用純文字模型即可。
 
 ```bash
 # 1. 安裝
-git clone https://github.com/MRSogzz/vlearn.git
+git clone https://github.com/MRSogzz/vlearn
 cd vlearn
 pip install -e ".[media]"
 
@@ -182,11 +182,11 @@ ANALYZE（分析） ┌─ 字幕管線：初篩 → 窗口切分 → LLM 摘要
 - **證據束採雙向重疊判定**，避免小窗口被大窗口吞併。
 - **可靠性加權仲裁：** `official_subtitle > keyframe_ocr > keyframe_vlm > asr > danmaku`，無法裁決時保留雙版本。
 - **顏色語義歸一化。** `red curtain` 與 `深紅色帷幕` 判定為一致，但報告保留原文。
-- **狀態全在本地。** 所有資料在 `out/` 的 SQLite 與檔案中，不依賴任何外部 API。
+- **狀態在本地。** 所有資料在 `out/` 的 SQLite 與檔案中；推理在你指定的地方執行，也可以完全本地。
 
 ## 設定
 
-換模型只需改 `config/models.yaml`，不用改程式碼。
+換模型只需改 `config/models.yaml`，不用改程式碼。任何 OpenAI 相容端點都可以。`keyframe_desc` 階段需要支援視覺的模型，其他階段用純文字模型即可。
 
 ```yaml
 providers:
@@ -272,9 +272,48 @@ vlearn videos --limit 20
 vlearn trend import <csv> && vlearn trend run --top 20
 ```
 
+## 驗證狀態
+
+vlearn 目前在三支不同類型的影片上做過抽樣檢查：每支影片抽 30 條斷言（共 90 條），逐條對照來源驗證。所有檢查都使用本地 4B 模型，其他模型尚未量測。樣本很小，請把它當成冒煙測試，而不是基準測試。
+
+| 指標 | 結果 |
+|---|---|
+| 抽樣斷言數 | 90（每支 30 條），逐條檢查 |
+| 可追溯率（時間戳 + 來源 ref 能對應到證據） | **100%**（90/90） |
+| VLM 原始輸出中的錯誤斷言 | **3/90**（3.3%；95% 信賴區間約 1% 至 9%） |
+| 進入最終摘要的錯誤斷言 | **未觀察到**（95% 上界約 4%） |
+| 樣本中來自圖表與案例圖片的斷言 | 檢查均正確（樣本中僅四張圖表） |
+
+**關於那 3 條錯誤斷言：** 每一條都是 VLM 對同一個畫面給出兩種互相矛盾的描述。例如一次說講者拿著綠色麥克風、另一次說黑色麥克風，而畫面實際上是貼著綠色標籤的黑色麥克風。衝突檢測標出了這個分歧，管線將這些斷言排除，摘要中沒有使用任何一條。
+
+**涵蓋的影片類型**
+
+| 類型 | 時長 | 特徵 |
+|---|---|---|
+| 幽默型研討會演講 | 約 6 分鐘 | 單鏡頭人像、大螢幕投影、少量文字 |
+| 正式商業演講 | 約 18 分鐘 | 單鏡頭人像、案例圖片、一張圖表 |
+| 音樂 MV | 約 3.5 分鐘 | 多場景剪輯、歌詞字幕、舞台與舞蹈 |
+
+合起來涵蓋：字幕從極密到極疏、畫面從幾乎不變到頻繁剪輯、近 5 倍的長度跨度、兩種演講風格，以及重複文字的字幕。
+
+**尚未測試**
+
+| 內容類型 | 為什麼重要 | 可能風險（尚未驗證） |
+|---|---|---|
+| 教程、投影片、程式碼演示、螢幕錄製 | VLM 幻覺最可能嚴重的場景 | 小型 VLM 可能編造圖表數字或程式碼。目前只測過一張圖表，證據不足 |
+| 無字幕影片（無聲示範、舞蹈） | 測試 `subtitle = 0` 的降級路徑 | 可能退化成只有關鍵幀斷言 |
+| 2 分鐘以下的短影片 | 測試 `triage.min_duration_sec: 120` 邊界 | 可能被判為「不值得深讀」而只走輕量摘要 |
+| 非英語影片 | 字幕語言覆蓋 | CJK 加權的斷言過濾只針對中英文調過 |
+| 訪談與 Podcast（固定機位、以人臉為主） | 畫面冗餘 | 可能把幀預算花在資訊量很低的畫面上 |
+| 新聞與紀錄片（多來源畫面混合） | 字幕與畫面高度相關 | 可能觸發更多衝突 |
+| 直播錄影（超過 1 小時） | 超長輸入 | 窗口數很多，LLM 呼叫成本可能快速上升 |
+
+**徵求協助：** 如果你在上述任一類型試用 vlearn，歡迎開 issue 回報影片類型、哪些有效、哪些無效。每份回報都會直接影響路線圖。
+
 ## 已知限制
 
-- 小型本地模型（例如 4B VLM）每次輸出有波動：同樣輸入的斷言數可能在 16–48 條之間。換更大的模型或設 `temperature=0` 可改善。
+- 小型本地模型（例如 4B VLM）每次輸出有波動：同一支影片的斷言數可能在 16–48 條之間浮動。換更大的模型或設 `temperature=0` 可改善。不同影片之間的條數差異屬正常，與此無關。
+- 衝突檢測抓得到「不一致」的錯誤；如果 VLM 每次都犯同樣的錯，就不會被標出。
 - VLM 可能過度解讀畫面（例如把「紅色」說成「深紅色」）。可用 `vlearn review` 修正，修正在重跑後仍會保留。
 - `apply_corrections` 是純字串替換，`assertions` 欄位不會隨修正更新。
 - 影片類型分類器可能把部分演講（如 TED）誤判為投影片簡報。
@@ -291,7 +330,7 @@ vlearn trend import <csv> && vlearn trend run --top 20
 <details>
 <summary><b>能換其他模型或雲端模型嗎？</b></summary>
 
-可以，修改 `config/models.yaml` 即可。常見選擇：Qwen3 27B（斷言更穩定，無視覺）、DeepSeek 等低價雲端模型、GPT-4o / Claude（品質最高、成本較高）。
+可以，修改 `config/models.yaml` 即可。任何 OpenAI 相容端點都能用，例如 GPT-4o、DeepSeek 等雲端模型，或本地的 Qwen3 27B（純文字，畫面需搭配視覺模型）。Claude 等非 OpenAI 格式的 API 可透過 OpenRouter、LiteLLM 這類相容閘道使用。目前只驗證過本地 4B 模型（見「驗證狀態」）。
 </details>
 
 <details>
@@ -339,6 +378,12 @@ out/
 └── frames/<video_id>/ # 擷取的關鍵幀
 ```
 刪掉 `out/` 即可重來；`vlearn.db` 可單獨備份。
+</details>
+
+<details>
+<summary><b>為什麼把衝突的斷言排除，而不是選一個？</b></summary>
+
+當來源可靠性排序能裁決分歧時，vlearn 會仲裁並採用較可靠的來源。無法裁決時，vlearn 保留雙版本、標記為未解決，且不在摘要中把任何一方當成事實陳述；可用 `get_conflicts(run_id)` 查看。代價是報告的斷言數可能少於模型原始輸出。這是刻意的取捨：缺一條斷言，比多一條沒人看得出來的錯誤斷言更容易接受。
 </details>
 
 <details>

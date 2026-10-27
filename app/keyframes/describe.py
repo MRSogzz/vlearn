@@ -1,17 +1,20 @@
 """VLM 描述關鍵幀 → 斷言。"""
 from __future__ import annotations
+from typing import Optional
 
 from app.context import AppContext
-from app.summarize.local import _filter_llm_assertions, _parse_llm_json
+from app.summarize.local import _parse_llm_json, _filter_llm_assertions
+
 
 _KEYFRAME_PROMPT = (
-    "這是一段視頻在 {ts:.1f}s 處的關鍵幀。"
+    "這是一段影片在 {ts:.1f}s 處的關鍵幀。"
     "請描述畫面中可見的具體內容，並抽取 2-5 條斷言。"
     "斷言必須描述畫面中可驗證的視覺事實："
-    "具體的顏色、文字、數字、人物、物體、場景結構、方向關係。"
-    "即使是場景描述（如'穿藍色襯衫的男人'、'紅色帷幕背景'），也算斷言。"
-    "禁止抽象詞（smart/important 等）。"
-    "只輸出 JSON，不要 markdown 代碼塊："
+    "具體的顏色、文字、數字、人物、物件、場景結構、方向關係。"
+    "即使是場景描述（如「穿藍色襯衫的男人」、「紅色帷幕背景」），也算斷言。"
+    "禁止抽象詞（聰明/重要 等）。"
+    "輸出語言：繁體中文（專有名詞保留原文）。"
+    "只輸出 JSON，不要 markdown 程式碼區塊："
     '{{"summary": "一句話描述", "assertions": ['
     '{{"claim": "穿深藍色襯衫的男人", "kind": "color"}}, '
     '{{"claim": "深紅色帷幕", "kind": "color"}}]}}'
@@ -25,7 +28,7 @@ def describe_frame(
     timestamp: float,
     time_range: tuple[float, float],
     frame_ref: str,
-) -> dict | None:
+) -> Optional[dict]:
     """返回 {summary, assertions}；不可用時返回 None。"""
     if not ctx.router.available("keyframe_desc"):
         return None
@@ -35,7 +38,7 @@ def describe_frame(
         "keyframe_desc", run_id,
         messages=[{"role": "user", "content": prompt}],
         images=[image_path],
-        max_tokens=1200,          # 600 → 1200：容納 5 條斷言的完整 JSON
+        max_tokens=1500,          # 从 1200 提到 1500，给 reasoning 留空间
         temperature=0.1,
     )
     if not resp:

@@ -4,12 +4,12 @@
 
 ### Give image-capable LLMs the ability to understand video.
 
-**Turn any YouTube video into a structured, timestamped, verifiable report, using local models and a 15-tool MCP server. No API fees.**
+**An open-source, model-agnostic MCP server that turns YouTube videos into structured, timestamped, verifiable reports. Use any OpenAI-compatible endpoint, hosted or local; run fully local for $0.**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-yellow.svg)](LICENSE)
 [![MCP Server](https://img.shields.io/badge/MCP-15%20tools-purple.svg)](#mcp-server)
-[![Local LLM](https://img.shields.io/badge/LLM-llama.cpp%20%7C%20Ollama-orange.svg)](https://github.com/ggerganov/llama.cpp)
+[![OpenAI-compatible](https://img.shields.io/badge/LLM-OpenAI--compatible-orange.svg)](#configuration)
 
 **English** · [繁體中文](README.zh-TW.md)
 
@@ -19,7 +19,7 @@
 
 ---
 
-vlearn is an open-source **YouTube video summarizer and MCP server** for people who want to *check* a summary, not just read it. It combines subtitles, keyframes and a local vision-language model (VLM) into a report where **every claim carries a timestamp and a source**, and where disagreements between sources are **flagged instead of silently merged**.
+vlearn is an open-source **YouTube video summarizer and MCP server** for people who want to *check* a summary, not just read it. It combines subtitles, keyframes and a vision-language model (VLM), local or hosted, into a report where **every claim carries a timestamp and a source**, and where disagreements between sources are **flagged instead of silently merged**.
 
 It also lets AI agents (Claude Desktop, Hermes and other MCP clients) work with video even when their model **can read images but has no native video input**. Instead of a raw video, the agent gets a timestamped timeline of subtitles and keyframe descriptions, and can pull **any single frame on demand**.
 
@@ -58,7 +58,7 @@ Most YouTube summarizers return a paragraph you have to trust. vlearn is built a
 
 - **Verifiable.** Every assertion is tagged with a timestamp and a source type (`official_subtitle`, `keyframe_ocr`, `keyframe_vlm`, `asr`, `danmaku`). You can jump back to the evidence.
 - **Honest about conflicts.** When the subtitles say one thing and a keyframe shows another, vlearn arbitrates by source reliability and, if unresolved, **keeps both versions**.
-- **It looks at the video, not just the transcript.** Keyframes are chosen by scene change and described by a local VLM. The image pipeline is independent of subtitles, so silent videos work too.
+- **It looks at the video, not just the transcript.** Keyframes are chosen by scene change and described by a VLM. The image pipeline is independent of subtitles, so silent videos work too.
 
 | | Typical summarizer | **vlearn** |
 |---|---|---|
@@ -73,11 +73,11 @@ Most YouTube summarizers return a paragraph you have to trust. vlearn is built a
 
 ## Quickstart
 
-**Prerequisites:** Python 3.10+, FFmpeg, [Deno](https://deno.com/) (needed by yt-dlp). A local LLM server is optional but recommended.
+**Prerequisites:** Python 3.10+, FFmpeg, [Deno](https://deno.com/) (needed by yt-dlp). An LLM endpoint (local server or hosted API) is optional but recommended. Frame analysis needs a vision-capable model; subtitle summaries work with text-only models.
 
 ```bash
 # 1. Install
-git clone https://github.com/MRSogzz/vlearn.git
+git clone https://github.com/MRSogzz/vlearn
 cd vlearn
 pip install -e ".[media]"
 
@@ -183,11 +183,11 @@ Design decisions that matter:
 - **Evidence bundles use bidirectional overlap**, so a short window is not swallowed by a long one.
 - **Reliability-weighted arbitration:** `official_subtitle > keyframe_ocr > keyframe_vlm > asr > danmaku`. Unresolved conflicts keep both versions.
 - **Semantic color normalization.** `red curtain` and `深紅色帷幕` count as consistent, but the report preserves the original wording.
-- **Fully local state.** Everything lives in SQLite plus files under `out/`; no external API is required.
+- **Local state.** Everything lives in SQLite plus files under `out/`. Inference runs wherever you point it, including fully local.
 
 ## Configuration
 
-Swap models by editing `config/models.yaml`; no code changes.
+Swap models by editing `config/models.yaml`; no code changes. Any OpenAI-compatible endpoint works. The `keyframe_desc` stage needs a vision-capable model; the other stages work with text-only models.
 
 ```yaml
 providers:
@@ -273,9 +273,48 @@ vlearn videos --limit 20
 vlearn trend import <csv> && vlearn trend run --top 20
 ```
 
+## Validation status
+
+vlearn has been spot-checked on three videos of different types. We sampled 30 assertions from each video (90 in total) and checked every one against its source. All checks used a local 4B model, and other models have not been measured. The sample is small, so read this as a smoke test rather than a benchmark.
+
+| Metric | Result |
+|---|---|
+| Sampled assertions | 90 (30 per video), each checked individually |
+| Traceability (timestamp + source ref resolves to evidence) | **100%** (90/90) |
+| Wrong assertions in raw VLM output | **3/90** (3.3%; 95% confidence interval roughly 1% to 9%) |
+| Wrong assertions that reached the final summary | **None observed** (95% upper bound about 4%) |
+| Assertions drawn from the chart and case-study images in the sample | All checked correct (only four chart in the sample) |
+
+**About the 3 wrong assertions:** each was a case where the VLM described the same frame in two conflicting ways. For example, one description said the speaker held a green microphone and another said a black microphone, while the frame actually shows a black microphone with a green label. Conflict detection flagged the disagreement, the pipeline excluded those assertions, and none of them was used in the summary.
+
+**Video types covered**
+
+| Type | Length | Characteristics |
+|---|---|---|
+| Humorous conference talk | about 6 min | Single-shot speaker, large projected screen, little on-screen text |
+| Formal business talk | about 18 min | Single-shot speaker, case-study images, one chart |
+| Music video | about 3.5 min | Multi-scene editing, lyric subtitles, stage and dance footage |
+
+Together these span very dense to very sparse subtitles, nearly static to heavily edited footage, a 5x range in length, two talk styles, and repeated-text subtitles.
+
+**Not yet tested**
+
+| Content type | Why it matters | Possible risk (unverified) |
+|---|---|---|
+| Tutorials, slide decks, code demos, screen recordings | Where VLM hallucination is likely worst | A small VLM may invent chart numbers or code. Only one chart was tested, so evidence is thin |
+| Videos without subtitles (silent demos, dance) | Exercises the `subtitle = 0` fallback | May degrade to keyframe-only assertions |
+| Short videos under 2 minutes | Tests the `triage.min_duration_sec: 120` boundary | May be judged "not worth reading" and get only a light summary |
+| Non-English videos | Subtitle language coverage | CJK-weighted assertion filtering is only tuned for Chinese and English |
+| Interviews and podcasts (fixed camera, faces) | Redundant frames | May spend frame budget on frames with little information |
+| News and documentaries (mixed footage) | Subtitles and visuals are tightly linked | May trigger more conflicts |
+| Livestream recordings (over 1 hour) | Very long inputs | Many windows, so LLM call cost may grow quickly |
+
+**Help wanted:** if you try vlearn on one of these types, please open an issue with the video type, what worked and what did not. Each report directly improves the roadmap.
+
 ## Known limitations
 
-- Small local models (e.g. a 4B VLM) vary run to run: assertion counts can range from about 16 to 48 on the same input. A larger model or `temperature=0` helps.
+- Small local models (e.g. a 4B VLM) vary run to run: on the same video, assertion counts can range from about 16 to 48. A larger model or `temperature=0` helps. Differences between *different* videos are normal and unrelated.
+- Conflict detection catches *inconsistent* errors. A mistake the VLM makes the same way every time would not be flagged.
 - VLMs can over-interpret frames (for example "dark red" for "red"). Use `vlearn review` to correct it; corrections persist across re-runs.
 - `apply_corrections` does plain substring replacement, and the `assertions` field does not reflect corrections.
 - The video-type classifier may misjudge some talks (e.g. TED) as slide presentations.
@@ -292,7 +331,7 @@ No. Without a local LLM, vlearn falls back to regex-based assertion extraction (
 <details>
 <summary><b>Can I use a different or hosted model?</b></summary>
 
-Yes, edit `config/models.yaml`. Common swaps: Qwen3 27B (more stable assertions, no vision), a cheap cloud model such as DeepSeek, or GPT-4o / Claude for the highest quality at higher cost.
+Yes, edit `config/models.yaml`. Any OpenAI-compatible endpoint works, for example a hosted model such as GPT-4o or DeepSeek, or a local Qwen3 27B (text-only, so pair it with a vision model for frames). Claude and other APIs that are not OpenAI-format can be used through a compatible gateway such as OpenRouter or LiteLLM. Only a local 4B model has been validated so far (see Validation status).
 </details>
 
 <details>
@@ -340,6 +379,12 @@ out/
 └── frames/<video_id>/ # Extracted keyframes
 ```
 Delete `out/` to start fresh. `vlearn.db` can be backed up on its own.
+</details>
+
+<details>
+<summary><b>Why exclude conflicting assertions instead of picking one?</b></summary>
+
+When the source-reliability ranking can settle a disagreement, vlearn arbitrates and uses the more reliable source. When it cannot, vlearn keeps both versions, marks the conflict unresolved, and does not state either one as fact in the summary; you can inspect them with `get_conflicts(run_id)`. The cost is that a report can contain fewer assertions than the raw model output. That trade is deliberate: a missing assertion is easier to live with than a wrong one that nobody can see.
 </details>
 
 <details>

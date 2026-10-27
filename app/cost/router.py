@@ -1,34 +1,37 @@
-"""模型路由 + LLM 調用。
+"""模型路由 + LLM 调用。
 
-關鍵設計：
-- 帶圖片的調用走流式（stream=True）
-  llama.cpp 在非流式 + vision 組合下有 bug（輸出退化為重複字符）
+- route(stage) 从 models.yaml 读出 (provider, model, config)
+- api_key 支持两种写法（优先级：直写 > 环境变量）
+- 模型名支持两种写法（优先级：served_model_name > key）
+- call(...) 真调用（OpenAI 兼容），无 key 或失败时返回 None
+- 计费按配置单价 + 峰值时段
 
-- 帶圖片的調用必須傳完整的 llama.cpp WebUI 擴展字段：
-    reasoning_control: True      — 讓服務端分離 thinking block
-    reasoning_format: "auto"     — 自動格式化
-    backend_sampling: False      — 禁用服務端默認採樣（關鍵！）
-    return_progress: True        — 返回進度
-    timings_per_token: True      — 返回 token 計時
-    sse_ping_interval: 1         — SSE 心跳間隔
+带图片的调用（llama.cpp / Qwen3-VL 等）：
+- 走流式（stream=True）—— 非流式 + vision 有 bug
+- 传 reasoning_control + reasoning_format + backend_sampling=False
+- 图片放 text 之前（chat template 对顺序敏感）
 
-  不加這些字段時，`llmserver.sh` 的 `--reasoning-budget 16384` 會強制
-  生成 thinking token，客戶端拿到的 content 是被汙染的結果（吐 '/'）。
+4B 模型常见问题：
+- content 字段为空但 reasoning_content 里有答案（model 把答案写进了 thinking）
+- 本模块会自动从 reasoning_content 抢救——见 _extract_from_reasoning
 
-- 圖片放在 text 之前（Qwen3-VL chat template 對順序敏感）
+日志：所有失败路径都会写 log.warning，便于诊断空 content / 超时 / context 超限。
 """
 from __future__ import annotations
-
 import base64
 import json
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 import httpx
 
 from app.cost.ledger import CostLedger
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -63,7 +66,7 @@ class ModelRouter:
         self.peak_hours = peak_hours or []
         self.ledger = ledger
 
-    def route(self, stage: str) -> ModelRef | None:
+    def route(self, stage: str) -> Optional[ModelRef]:
         r = self.cfg.get("routing", {}).get(stage)
         if not r:
             return None
@@ -104,17 +107,9 @@ class ModelRouter:
 
     def call(self, stage: str, run_id: str, *,
              messages: list[dict],
-             images: list[str] | None = None,
+             images: Optional[list[str]] = None,
              temperature: float = 0.2,
-             max_tokens: int = 1024) -> str | None:
-        """返回文本；無 key 或失敗時返回 None（調用方降級）。
-
-        帶圖片的調用強制加 llama.cpp WebUI 的完整字段集：
-        - stream=True
-        - reasoning_control=True + reasoning_format="auto"（分離 thinking）
-        - backend_sampling=False（禁用服務端默認採樣，避免 thinking 汙染）
-        - return_progress / timings_per_token / sse_ping_interval（WebUI 兼容）
-        """
+             max_tokens: int = 1024) -> Optional[str]:
         ref = self.route(stage)
         if not ref or not ref.api_key:
             return None
@@ -132,7 +127,7 @@ class ModelRouter:
         }
 
         if images:
-            # ★ 關鍵的 6 個字段——缺一個都會導致 thinking token 汙染輸出
+            # llama.cpp 的完整 reasoning 控制字段
             payload["reasoning_control"] = True
             payload["reasoning_format"] = "auto"
             payload["backend_sampling"] = False
@@ -148,7 +143,11 @@ class ModelRouter:
                 text = self._call_stream(ref, payload)
             else:
                 text = self._call_blocking(ref, payload)
-        except Exception:
+        except Exception as e:
+            log.warning(
+                "router.call %s raised: %s: %s",
+                stage, type(e).__name__, e, exc_info=True,
+            )
             return None
 
         if text is None:
@@ -167,59 +166,146 @@ class ModelRouter:
                            is_peak=ref.is_peak, stage=stage)
         return text
 
-    def _call_blocking(self, ref: ModelRef, payload: dict) -> str | None:
-        with httpx.Client(timeout=300) as client:
-            r = client.post(
+    def _call_blocking(self, ref: ModelRef, payload: dict) -> Optional[str]:
+        """非流式调用（纯文本）。所有失败路径都打日志。
+
+        4B 模型有时把答案写进 reasoning_content 而 content 为空，
+        这种情况下从 reasoning_content 提取最后一段作为兜底。
+        """
+        try:
+            with httpx.Client(timeout=300) as client:
+                r = client.post(
+                    f"{ref.base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {ref.api_key}",
+                             "Content-Type": "application/json"},
+                    json=payload,
+                )
+            if r.status_code != 200:
+                log.warning(
+                    "LLM %s status=%s body=%s",
+                    ref.model, r.status_code, r.text[:300],
+                )
+                return None
+            data = r.json()
+            choices = data.get("choices", [])
+            if not choices:
+                log.warning(
+                    "LLM %s returned empty choices: %s",
+                    ref.model, str(data)[:500],
+                )
+                return None
+            message = choices[0].get("message", {})
+            content = (message.get("content") or "").strip()
+
+            # ── 关键：content 空时，从 reasoning_content 抢救 ──
+            if not content:
+                reasoning = (
+                    message.get("reasoning_content")
+                    or message.get("reasoning")
+                    or ""
+                )
+                if reasoning:
+                    log.info(
+                        "LLM %s content empty, extracting from reasoning_content (len=%d)",
+                        ref.model, len(reasoning),
+                    )
+                    content = self._extract_from_reasoning(reasoning)
+
+            if not content:
+                log.warning(
+                    "LLM %s returned empty content AND empty reasoning. "
+                    "message_keys=%s finish_reason=%s",
+                    ref.model,
+                    list(message.keys()),
+                    choices[0].get("finish_reason"),
+                )
+                return None
+
+            usage = data.get("usage", {})
+            payload["_usage"] = usage
+            return content
+        except Exception as e:
+            log.warning(
+                "LLM %s raised: %s: %s",
+                ref.model, type(e).__name__, e, exc_info=True,
+            )
+            return None
+
+    @staticmethod
+    def _extract_from_reasoning(reasoning: str) -> str:
+        """从 reasoning_content 提取最后一段作为答案。
+
+        4B 模型在 reasoning 末尾常会输出 "Draft:" / "Output:" / "Final Answer:"
+        之类标记，后面才是真正的答案。如果没有标记，就取最后一段非空段落。
+        返回长度上限 500 字，避免把整段 thinking 当成答案。
+        """
+        if not reasoning or not reasoning.strip():
+            return ""
+
+        # 优先找显式标记
+        markers = [
+            "Draft:", "Draft Answer:", "Final Answer:", "Final:",
+            "Output:", "Answer:", "Overview:", "Summary:",
+        ]
+        for marker in markers:
+            idx = reasoning.rfind(marker)
+            if idx != -1:
+                tail = reasoning[idx + len(marker):].strip()
+                if tail:
+                    return tail[:500]
+
+        # 没有标记，取最后一段非空
+        paragraphs = [p.strip() for p in reasoning.split("\n\n") if p.strip()]
+        if not paragraphs:
+            return ""
+        last = paragraphs[-1]
+        return last[:500]
+
+    def _call_stream(self, ref: ModelRef, payload: dict) -> Optional[str]:
+        """流式调用（带图片时必须用）。"""
+        chunks: list[str] = []
+        try:
+            with httpx.stream(
+                "POST",
                 f"{ref.base_url}/chat/completions",
                 headers={"Authorization": f"Bearer {ref.api_key}",
                          "Content-Type": "application/json"},
                 json=payload,
+                timeout=300,
+            ) as r:
+                if r.status_code != 200:
+                    log.warning(
+                        "LLM stream %s status=%s", ref.model, r.status_code,
+                    )
+                    return None
+                for line in r.iter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
+                    data_str = line[6:].strip()
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        obj = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = obj.get("choices", [])
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta", {})
+                    content = delta.get("content")
+                    if content:
+                        chunks.append(content)
+        except Exception as e:
+            log.warning(
+                "LLM stream %s raised: %s: %s",
+                ref.model, type(e).__name__, e, exc_info=True,
             )
-        if r.status_code != 200:
             return None
-        data = r.json()
-        usage = data.get("usage", {})
-        payload["_usage"] = usage
-        return data["choices"][0]["message"].get("content") or ""
-
-    def _call_stream(self, ref: ModelRef, payload: dict) -> str | None:
-        chunks: list[str] = []
-        with httpx.stream(
-            "POST",
-            f"{ref.base_url}/chat/completions",
-            headers={"Authorization": f"Bearer {ref.api_key}",
-                     "Content-Type": "application/json"},
-            json=payload,
-            timeout=300,
-        ) as r:
-            if r.status_code != 200:
-                return None
-            for line in r.iter_lines():
-                if not line or not line.startswith("data: "):
-                    continue
-                data_str = line[6:].strip()
-                if data_str == "[DONE]":
-                    break
-                try:
-                    obj = json.loads(data_str)
-                except json.JSONDecodeError:
-                    continue
-                choices = obj.get("choices", [])
-                if not choices:
-                    continue
-                delta = choices[0].get("delta", {})
-                content = delta.get("content")
-                if content:
-                    chunks.append(content)
         return "".join(chunks) if chunks else ""
 
     def _build_messages(self, messages: list[dict],
-                        images: list[str] | None) -> list[dict]:
-        """把圖片合入最後一條 user message。
-
-        ★ image 必須在 text 之前
-        Qwen3-VL 的 chat template 對 content 順序敏感。
-        """
+                        images: Optional[list[str]]) -> list[dict]:
+        """把图片合入最后一条 user message（image 在前，text 在后）。"""
         if not images:
             return messages
 
@@ -247,7 +333,7 @@ class ModelRouter:
                 "role": "user",
                 "content": [
                     *user_parts,
-                    {"type": "text", "text": "請基於以上圖片回答。"},
+                    {"type": "text", "text": "请基于以上图片回答。"},
                 ],
             })
             return out
@@ -268,7 +354,7 @@ class ModelRouter:
 
         return out
 
-    def _load_image_data(self, path: str) -> str | None:
+    def _load_image_data(self, path: str) -> Optional[str]:
         p = Path(path)
         if not p.exists():
             return None

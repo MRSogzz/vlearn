@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import argparse
 import sys
 
@@ -69,7 +68,16 @@ def main(argv: list[str] | None = None) -> int:
         if not row:
             console.print(f"[red]report {args.run_id} not found[/red]")
             return 1
-        console.print(row["report_md"], markup=False, highlight=False)
+        # 直接写 stdout，绕过 rich 的 Windows legacy renderer
+        # （cp950 / cp936 等窄编码环境会因简体中文崩溃）
+        md = row["report_md"]
+        try:
+            sys.stdout.write(md + "\n")
+            sys.stdout.flush()
+        except UnicodeEncodeError:
+            # 兜底：强制 UTF-8 重写
+            sys.stdout.buffer.write((md + "\n").encode("utf-8"))
+            sys.stdout.buffer.flush()
         return 0
 
     if args.cmd == "review":
